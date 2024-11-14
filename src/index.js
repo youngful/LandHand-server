@@ -24,7 +24,6 @@ app.use(
 app.use(cookieParser())
 app.use(express.json())
 app.use(routes)
-app.use('/uploads', express.static(path.join(__dirname, '../src/uploads')))
 
 const startServer = () => {
 	app.listen(port, () => {

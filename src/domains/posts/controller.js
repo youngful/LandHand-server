@@ -1,15 +1,19 @@
 require('dotenv').config()
-const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 const jwt = require('jsonwebtoken')
-const fs = require('fs')
 const Post = require('./model')
 const User = require('../user/model')
 const multer = require('multer')
 const secret = process.env.JWT_SECRET
+const cloudinary = require('cloudinary').v2
+
+cloudinary.config({
+	cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+	api_key: process.env.CLOUDINARY_API_KEY,
+	api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
 const upload = multer({
-	dest: path.join(__dirname, '../../uploads/'),
 	fileFilter: (req, file, cb) => {
 		const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg']
 		if (!allowedTypes.includes(file.mimetype)) {
@@ -23,7 +27,6 @@ const upload = multer({
 		cb(null, true)
 	},
 })
-
 module.exports.create_post = [
 	upload.single('img'),
 
@@ -39,28 +42,33 @@ module.exports.create_post = [
 				return res.status(400).json({ error: 'Author not found' })
 			}
 
-			let imgPath = null
+			let imgUrl = null
+
 			if (req.file) {
-				const fileExtension = req.file.originalname.split('.').pop()
-				console.log(fileExtension)
+				const result = await new Promise((resolve, reject) => {
+					const stream = cloudinary.uploader.upload_stream(
+						{
+							public_id: uuidv4(),
+							folder: 'HandLand',
+						},
+						(error, result) => {
+							if (error) {
+								return reject(error) 
+							}
+							resolve(result) 
+						}
+					)
+					stream.end(req.file.buffer) 
+				})
 
-				const uniqueFilename = uuidv4() + '.' + fileExtension
-
-				console.log(uniqueFilename)
-
-				const newFilePath = path.join(
-					__dirname,
-					'../../uploads',
-					uniqueFilename
-				)
-
-				fs.renameSync(req.file.path, newFilePath)
+				imgUrl = result.secure_url
 			}
 
+			// Створення поста
 			const post = await Post.create({
 				title,
 				content,
-				img: uniqueFilename,
+				img: imgUrl, 
 				author: authorUser._id,
 			})
 
